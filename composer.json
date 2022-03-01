@@ -1,0 +1,36 @@
+{
+    "name": "loungeup/nats-swoole",
+    "type": "library",
+    "version": "dev-master",
+    "autoload": {
+        "files": [
+            "src/helpers.php",
+            "src/nuid/Nuid.php"
+        ],
+        "psr-4": {
+            "LoungeUp\\Nats\\": "src/",
+            "LoungeUp\\Nats\\Nuid\\": "src/nuid/"
+        }
+    },
+    "authors": [
+        {
+            "name": "LoungeUp",
+            "email": "devs@loungeup.com",
+            "homepage": "https://loungeup.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "ext-openswoole": "^4.10.0"
+    },
+    "require-dev": {
+        "openswoole/ide-helper": "^4.7",
+        "pestphp/pest": "^1.21",
+        "spiral/goridge": "^3.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

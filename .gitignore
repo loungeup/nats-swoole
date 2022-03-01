@@ -1,0 +1,5 @@
+/vendor/
+/node_modules/
+/.vscode/
+.phpunit.result.cache
+/html-coverage/
