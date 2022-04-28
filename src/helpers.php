@@ -81,7 +81,7 @@ if (!function_exists("checkAuthError")) {
     }
 }
 
-if (!function_exists("defaultErrorHAndler")) {
+if (!function_exists("defaultErrorHandler")) {
     function defaultErrorHandler()
     {
         return function (Connection $nc = null, Subscription $sub = null, ?Exception $e) {
@@ -118,7 +118,7 @@ if (!function_exists("decodeHeadersMsg")) {
             $t = explode("\n", $data);
         }
 
-        $l = $t[0];
+        $l = array_shift($t);
         if (
             strlen($l) < Constants::hdrPreEnd ||
             substr($l, 0, Constants::hdrPreEnd) !== substr(Constants::hdrLine, 0, Constants::hdrPreEnd)
@@ -150,9 +150,8 @@ if (!function_exists("decodeHeadersMsg")) {
 
                 $mh[Constants::descrHdr][] = $status;
             }
-
-            return $mh;
         }
+        return $mh;
     }
 }
 if (!function_exists("readMIMEHeader")) {

@@ -6,7 +6,7 @@ use Exception;
 class Message
 {
     public function __construct(
-        public string $subject,
+        public ?string $subject = null,
         public ?string $data = null,
         public ?Subscription $sub = null,
         public ?string $reply = null,
@@ -38,7 +38,7 @@ class Message
         return $hdr;
     }
 
-    public function respond(string $data)
+    public function respond(?string $data)
     {
         if ($this->sub === null) {
             throw new Exception(Errors::ErrMsgNotBound->value);

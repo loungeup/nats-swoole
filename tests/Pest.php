@@ -3,6 +3,8 @@
 use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\Constants;
 use LoungeUp\Nats\Defaults;
+use Swoole\Coroutine\Channel;
+use Swoole\Timer;
 
 /**
  * helper method to access private function
@@ -53,4 +55,18 @@ function waitFor(string $totalWait, int $sleepDur, Closure $func)
     if ($err !== null) {
         throw $err;
     }
+}
+
+function wait(Channel $ch)
+{
+    return waitTime($ch, 5);
+}
+
+function waitTime(Channel $ch, int $timeout)
+{
+    $r = $ch->pop($timeout);
+    if (!$r && $ch->errCode == -1) {
+        throw new Exception("timeout waiting");
+    }
+    return null;
 }

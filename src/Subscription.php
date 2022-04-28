@@ -8,13 +8,13 @@ use Swoole\Coroutine\System;
 use Swoole\Lock;
 use Throwable;
 
-abstract class SubscriptionType
+enum SubscriptionType: int
 {
-    const AsyncSubscription = 0;
-    const SyncSubscription = 1;
-    const ChanSubscription = 2;
-    const NilSubscription = 3;
-    const PullSubscription = 4;
+    case AsyncSubscription = 0;
+    case SyncSubscription = 1;
+    case ChanSubscription = 2;
+    case NilSubscription = 3;
+    case PullSubscription = 4;
 }
 
 class Subscription
@@ -32,7 +32,7 @@ class Subscription
         public bool $closed = false,
         public bool $sc = false,
         public bool $connClosed = false,
-        public int $type = -1,
+        public SubscriptionType $type = SubscriptionType::AsyncSubscription,
 
         //async linked list
         public ?Message $pHead = null,
@@ -193,5 +193,49 @@ class Subscription
         }
 
         // TODO handle jetstream
+    }
+
+    public function setPendingLimit(int $msgLimit, int $bytesLimit)
+    {
+        $this->mu->pop();
+
+        if ($this->conn == null || $this->closed) {
+            throw new Exception(Errors::ErrBadSubscription->value);
+        }
+
+        if ($this->type == SubscriptionType::ChanSubscription) {
+            throw new Exception(Errors::ErrTypeSubscription->value);
+        }
+
+        if ($msgLimit == 0 || $bytesLimit == 0) {
+            throw new Exception(Errors::ErrInvalidArg->value);
+        }
+
+        $this->pMsgsLimit = $msgLimit;
+        $this->pBytesLimit = $bytesLimit;
+
+        $this->mu->push(1);
+    }
+
+    /**
+     * @return int[]
+     */
+    public function pending(): array
+    {
+        $this->mu->pop();
+
+        if ($this->conn == null || $this->closed) {
+            $this->mu->push(1);
+            throw new Exception(Errors::ErrBadSubscription->value);
+        }
+
+        if ($this->type == SubscriptionType::ChanSubscription) {
+            $this->mu->push(1);
+            throw new Exception(Errors::ErrTypeSubscription->value);
+        }
+
+        $out = [$this->pMsgs, $this->pBytes];
+        $this->mu->push(1);
+        return $out;
     }
 }

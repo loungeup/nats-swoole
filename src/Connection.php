@@ -680,7 +680,7 @@ class Connection
         return $this->bw->flushPendingBuffer();
     }
 
-    private function flushTimeout(int $microsec)
+    public function flushTimeout(int $microsec)
     {
         if ($microsec <= 0) {
             throw new Exception(Errors::ErrBadTimeout->value);
@@ -697,7 +697,7 @@ class Connection
         $this->sendPing($ch);
         $this->mu->push(1);
 
-        $ok = $ch->pop();
+        $ok = $ch->pop($microsec / 1000 / 1000);
 
         $err = null;
         if ($ok === false) {
@@ -849,10 +849,13 @@ class Connection
                     $this->parse($buff);
                 }
             } catch (Throwable $e) {
-                echo "[readLoop] Exception\n";
-                var_dump($e->getMessage());
-                var_dump($e->getLine());
-                var_dump($e->getTraceAsString());
+                // do not print an error if we are closing the connection
+                if ($conn !== null && !$this->isClosed()) {
+                    echo "[readLoop] Exception\n";
+                    var_dump($e->getMessage());
+                    var_dump($e->getLine());
+                    var_dump($e->getTraceAsString());
+                }
                 $err = $e;
             }
 
@@ -1001,7 +1004,7 @@ class Connection
 
     private function processMsgArgs(string $arg)
     {
-        if ($this->ps->hdr > 0) {
+        if ($this->ps->hdr >= 0) {
             return $this->processHeaderMsgArgs($arg);
         }
 
@@ -1087,7 +1090,7 @@ class Connection
         }
 
         if ($start >= 0) {
-            array_push($args, substr($arg, $start + 1));
+            array_push($args, substr($arg, $start));
         }
 
         switch (count($args)) {
@@ -2134,6 +2137,12 @@ class Connection
         return $this->subscribeImpl($subj, $queue, $cb, null, false, null);
     }
 
+    public function queueSubscribeSync(string $subj, string $queue): Subscription
+    {
+        $mch = new Channel($this->opts->subChanLen);
+        return $this->subscribeImpl($subj, $queue, null, $mch, true, null);
+    }
+
     private function subscribeImpl(
         string $subj,
         string $queue,
@@ -2363,7 +2372,7 @@ class Connection
      *
      * @return Channel[]|string[]|Exception[]
      */
-    private function createNewRequestAndSend(string $subj, ?string $hdr, string $data): array
+    private function createNewRequestAndSend(string $subj, ?string $hdr, ?string $data): array
     {
         $this->mu->pop();
 
@@ -2459,7 +2468,7 @@ class Connection
 
     // RequestMsg will send a request payload including optional headers and deliver
     // the response message, or an error, including a timeout if no message was received properly
-    public function requestMsg(Message $msg, int $timeout): Message
+    public function requestMsg(Message $msg, float $timeout): Message
     {
         $hdr = null;
 
@@ -2476,7 +2485,7 @@ class Connection
 
     // Request will send a request payload and deliver the response message,
     // or an error, including a timeout if no message was received properly.
-    public function request(string $subj, string $data, int $timeout): Message
+    public function request(string $subj, ?string $data, float $timeout): Message
     {
         return $this->requestImpl($subj, null, $data, $timeout);
     }
@@ -2487,7 +2496,7 @@ class Connection
         return $b;
     }
 
-    private function requestImpl(string $subj, ?string $hdr, string $data, int $timeout): Message
+    private function requestImpl(string $subj, ?string $hdr, ?string $data, float $timeout): Message
     {
         $m = null;
         $err = null;
@@ -2507,7 +2516,12 @@ class Connection
         }
 
         // check for no responder
-        if ($err == null && strlen($m->data) == 0 && $m->header[Constants::statusHdr] == Constants::noResponders) {
+        if (
+            $err == null &&
+            strlen($m->data) == 0 &&
+            isset($m->header[Constants::statusHdr]) &&
+            $m->header[Constants::statusHdr][0] == Constants::noResponders
+        ) {
             $m = null;
             $err = new Exception(Errors::ErrNoResponders->value);
         }
@@ -2522,7 +2536,7 @@ class Connection
     /* oldRequest will create an Inbox and perform a Request() call
      with the Inbox reply and return the first reply received.
      This is optimized for the case of multiple responses.*/
-    private function oldRequest(string $subj, ?string $hdr, string $data, int $timeout): Message
+    private function oldRequest(string $subj, ?string $hdr, ?string $data, float $timeout): Message
     {
         $inbox = $this->newInbox();
         $ch = new Channel(Defaults::RequestChanLen);
@@ -2540,7 +2554,7 @@ class Connection
         return $m;
     }
 
-    private function newRequest(string $subj, ?string $hdr, string $data, int $timeout): Message
+    private function newRequest(string $subj, ?string $hdr, ?string $data, float $timeout): Message
     {
         [$mch, $token, $err] = $this->createNewRequestAndSend($subj, $hdr, $data);
 
@@ -2699,5 +2713,24 @@ class Connection
 
         $this->mu->push(1);
         return $out;
+    }
+
+    public function setErrorHandler(Closure $cb)
+    {
+        $this->mu->pop();
+        $this->opts->asyncErrorCB = $cb;
+        $this->mu->push(1);
+    }
+
+    public function buffered()
+    {
+        $this->mu->pop();
+        if ($this->isClosed() || $this->bw == null) {
+            $this->mu->push(1);
+            throw new Exception(Errors::ErrConnectionClosed->value);
+        }
+        $buffered = $this->bw->buffered();
+        $this->mu->push(1);
+        return $buffered;
     }
 }
