@@ -11,7 +11,6 @@ use LoungeUp\Nats\ConnectionStatus;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\Client;
 use Swoole\Coroutine\WaitGroup;
-use Swoole\Lock;
 use Swoole\Timer;
 use Throwable;
 
@@ -35,7 +34,7 @@ class Connection
     public ?Channel $fch = null;
     public ServerInfo $info;
     public int $ssid = 0;
-    public ?Lock $subsMu;
+    public ?Channel $subsMu;
     /**
      * @var Subscription[]|null
      */
@@ -82,7 +81,8 @@ class Connection
         $this->stats = new Statistics();
         $this->mu = new Channel();
         $this->mu->push(1);
-        $this->subsMu = new Lock(SWOOLE_RWLOCK);
+        $this->subsMu = new Channel(1);
+        $this->subsMu->push(1);
         $this->cond = new Channel(1);
         $this->wg = new WaitGroup();
     }
@@ -629,7 +629,7 @@ class Connection
 
     private function resendSubscriptions()
     {
-        getLock([$this->subsMu, "trylock_read"]);
+        $this->subsMu->pop();
 
         /**
          * @var Subscription[]
@@ -639,7 +639,7 @@ class Connection
             $subs[] = $sub;
         }
 
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
 
         foreach ($subs as $s) {
             $adjustedMax = 0;
@@ -1135,7 +1135,7 @@ class Connection
         // Don't lock the connection to avoid server cutting us off if the
         // flusher is holding the connection lock, trying to send to the server
         // that is itself trying to send data to us.
-        getLock([$this->subsMu, "trylock_read"]);
+        $this->subsMu->pop();
 
         $sub = isset($this->subs[$this->ps->ma->sid]) ? $this->subs[$this->ps->ma->sid] : null;
         $mf = null;
@@ -1144,7 +1144,7 @@ class Connection
             $mf = $this->filters[$this->ps->ma->subject];
         }
 
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
 
         if ($sub === null) {
             return;
@@ -1895,7 +1895,7 @@ class Connection
             $this->bw->flush();
         }
 
-        getLock([$this->subsMu, "trylock"]);
+        $this->subsMu->pop();
 
         foreach ($this->subs as $s) {
             $s->mu->pop();
@@ -1920,7 +1920,7 @@ class Connection
         }
 
         $this->subs = null;
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
 
         $this->status = $status;
 
@@ -1997,7 +1997,7 @@ class Connection
     // PublishRequest will perform a Publish() expecting a response on the
     // reply subject. Use Request() for automatically waiting for a response
     // inline.
-    public function publishRequest(string $subj, string $reply, string $data)
+    public function publishRequest(string $subj, string $reply, ?string $data)
     {
         return $this->publishImpl($subj, $reply, null, $data);
     }
@@ -2095,8 +2095,16 @@ class Connection
 
         $rt = $this->respToken($m->subject);
         if ($rt !== Constants::_EMPTY_) {
-            $mch = $this->respMap[$rt];
-            unset($this->respMap[$rt]);
+            if (array_key_exists($rt, $this->respMap)) {
+                $mch = $this->respMap[$rt];
+                unset($this->respMap[$rt]);
+            } else {
+                // the reply token doesn't exist anymore
+                // it's a reply we got after the request timeout
+                // we can only ignore it
+                $this->mu->push(1);
+                return;
+            }
         } elseif (count($this->respMap) === 1) {
             foreach ($this->respMap as $k => $v) {
                 $mch = $v;
@@ -2213,11 +2221,11 @@ class Connection
             $sub->mch = $ch;
         }
 
-        getLock([$this->subsMu, "trylock"]);
+        $this->subsMu->pop();
         $this->ssid++;
         $sub->sid = $this->ssid;
         $this->subs[$sub->sid] = $sub;
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
 
         if ($sr) {
             go([$this, "waitForMsgs"], $sub);
@@ -2324,9 +2332,9 @@ class Connection
 
     public function removeSub(Subscription $s)
     {
-        getLock([$this->subsMu, "trylock"]);
+        $this->subsMu->pop();
         unset($this->subs[$s->sid]);
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
         $s->mu->pop();
 
         if ($s->mch !== null && $s->type === SubscriptionType::SyncSubscription) {
@@ -2344,18 +2352,18 @@ class Connection
 
     public function addMsgFilter(string $subject, Closure $filter)
     {
-        getLock([$this->subsMu, "trylock"]);
+        $this->subsMu->pop();
 
         if ($this->filters !== null) {
             $this->filters = [];
         }
         $this->filters[$subject] = $filter;
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
     }
 
     public function removeMsgFilter(string $subject)
     {
-        getLock([$this->subsMu, "trylock"]);
+        $this->subsMu->pop();
 
         if ($this->filters !== null) {
             unset($this->filters[$subject]);
@@ -2364,7 +2372,7 @@ class Connection
                 $this->filters = null;
             }
         }
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
     }
 
     /**
@@ -2550,7 +2558,12 @@ class Connection
         $this->publishImpl($subj, $inbox, $hdr, $data);
 
         $m = $s->nextMsg($timeout);
-        $s->unsubscribe();
+
+        // catch error when unsubscribing as we might have auto unsubscribe
+        try {
+            $s->unsubscribe();
+        } catch (Exception $e) {
+        }
         return $m;
     }
 
@@ -2603,9 +2616,9 @@ class Connection
             throw new Exception(Errors::ErrConnectionClosed->value);
         }
 
-        getLock([$this->subsMu, "trylock_read"]);
+        $this->subsMu->pop();
         $s = $this->subs[$sub->sid];
-        $this->subsMu->unlock();
+        $this->subsMu->push(1);
 
         if ($s === null) {
             return;

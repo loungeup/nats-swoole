@@ -197,17 +197,6 @@ if (!function_exists("readMIMEHeader")) {
     }
 }
 
-if (!function_exists("getLock")) {
-    function getLock(callable $cb)
-    {
-        $hasLock = call_user_func($cb);
-        while (!$hasLock) {
-            usleep(1);
-            $hasLock = call_user_func($cb);
-        }
-    }
-}
-
 if (!function_exists("badSubject")) {
     function badSubject(string $sub): bool
     {

@@ -4,6 +4,7 @@ use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\Defaults;
 use LoungeUp\Nats\Errors;
 use LoungeUp\Nats\Message;
+use LoungeUp\Nats\Options;
 use Spiral\Goridge;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
@@ -11,15 +12,14 @@ use Swoole\Coroutine\WaitGroup;
 use Swoole\Runtime;
 
 use function LoungeUp\Nats\getDefaultOptions;
+use function LoungeUp\Nats\newInbox;
 
 beforeEach(function () {
-    Runtime::enableCoroutine();
     Coroutine::set([
         "hook_flags" => SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_SOCKETS,
         "socket_timeout" => -1,
         "enable_preemptive_scheduler" => true,
     ]);
-    Coroutine::enableScheduler();
 });
 
 function getStableNumCoroutine(): int
@@ -668,6 +668,237 @@ it("should support basic no responder errors", function () {
         expect($err)->toBeNull();
 
         expect(fn() => $nc->request("foo", null, 1))->toThrow(Exception::class, Errors::ErrNoResponders->value);
+        $nc->close();
+        // test old request
+        $err = null;
+        try {
+            $nc = Connection::createConnection(strval($url), new Options(useOldRequestStyle: true));
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+
+        expect(fn() => $nc->request("foo", null, 1))->toThrow(Exception::class, Errors::ErrNoResponders->value);
+
+        // subscribe sync
+        $inbox = newInbox();
+        $err = null;
+        try {
+            $sub = $nc->subscribeSync($inbox);
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+
+        try {
+            $nc->publishRequest("foo", $inbox, null);
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+
+        expect(fn() => $sub->nextMsg(2))->toThrow(Exception::class, Errors::ErrNoResponders->value);
+
+        $nc->close();
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle oldRequestStyle", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $err = null;
+
+        try {
+            $nc = Connection::createConnection("nats://rpcnats:4222", new Options(useOldRequestStyle: true));
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+
+        $response = "I will help you";
+        $nc->subscribe("foo", function (Message $msg) use ($response) {
+            $msg->respond($response);
+        });
+
+        $err = null;
+        try {
+            $msg = $nc->request("foo", "hello", 0.5);
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+        expect($msg->data)->toBe($response);
+
+        $errCh = new Channel(1);
+        $start = microtime(true);
+
+        go(function () use ($nc, $errCh) {
+            $sub = $nc->subscribeSync("checkClose");
+            $err = null;
+            try {
+                $nc->request("checkClose", "should be kicked out on close", 1);
+            } catch (Exception $e) {
+                $err = $e;
+            }
+            $errCh->push($err);
+
+            try {
+                $sub->unsubscribe();
+            } catch (Exception $e) {
+            }
+        });
+
+        usleep(100000);
+        $nc->close();
+
+        $out = $errCh->pop();
+        expect($out->getMessage())->toBe(Errors::ErrConnectionClosed->value);
+        $time = microtime(true) - $start;
+
+        // check if request take too much time to fail
+        expect($time)->toBeLessThan(1);
+
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle newRequestStyle", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $nc = newDefaultConnection();
+
+        $response = "I will help you";
+        $nc->subscribe("foo", function (Message $msg) use ($response, $nc) {
+            $nc->publish($msg->reply, $response);
+        });
+
+        $err = null;
+        try {
+            $msg = $nc->request("foo", "help", 0.5);
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+        expect($msg->data)->toBe($response);
+
+        $nc->close();
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle request without body", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $nc = newDefaultConnection();
+
+        $response = "I will help you";
+        $nc->subscribe("foo", function (Message $msg) use ($response, $nc) {
+            $nc->publish($msg->reply, $response);
+        });
+
+        $err = null;
+        try {
+            $msg = $nc->request("foo", null, 0.5);
+        } catch (Throwable $t) {
+            $err = $t;
+        }
+        expect($err)->toBeNull();
+        expect($msg->data)->toBe($response);
+
+        $nc->close();
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle simultaneous requests", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $nc = newDefaultConnection();
+
+        $response = "I will help you";
+        $nc->subscribe("foo", function (Message $msg) use ($response, $nc) {
+            $nc->publish($msg->reply, $response);
+        });
+
+        $wg = new WaitGroup();
+        $wg->add(50);
+        $errCh = new Channel(50);
+
+        for ($i = 0; $i < 50; $i++) {
+            go(function () use ($wg, $errCh, $nc) {
+                defer(fn() => $wg->done());
+
+                try {
+                    $nc->request("foo", null, 2);
+                } catch (Exception $e) {
+                    $errCh->push($e);
+                }
+            });
+        }
+
+        $wg->wait();
+
+        expect(checkErrChannel($errCh))->not->toThrow(Exception::class);
+
+        $nc->close();
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle close during request", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $nc = newDefaultConnection();
+
+        $wg = new WaitGroup();
+        $wg->add(1);
+
+        go(function () use ($nc, $wg) {
+            defer(fn() => $wg->done());
+            usleep(100_000);
+            $nc->close();
+        });
+
+        $nc->subscribeSync("foo");
+
+        $err = null;
+        try {
+            $nc->request("foo", "help", 2);
+        } catch (Exception $e) {
+            $err = $e;
+        }
+        expect($err)->not->toBeNull();
+        expect($err->getMessage())->toBeIn([Errors::ErrInvalidConnection->value, Errors::ErrConnectionClosed->value]);
+
+        $nc->close();
+        $rpc->call("App.Shutdown", "");
+    });
+});
+
+it("should handle close timeout on request with response queued", function () {
+    $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
+    Co\run(function () use ($rpc) {
+        $rpc->call("App.RunDefaultServer", "");
+        $nc = newDefaultConnection();
+
+        $nc->subscribe("foo", function (Message $msg) use ($nc) {
+            $nc->publish($msg->reply, "I will help you");
+            $nc->close();
+        });
+
+        $err = null;
+        try {
+            $nc->request("foo", null, 1);
+        } catch (Exception $e) {
+            $err = $e;
+        }
+        expect($err)->not->toBeNull(); // ensure we get a timeout even if the response is queued
 
         $nc->close();
         $rpc->call("App.Shutdown", "");

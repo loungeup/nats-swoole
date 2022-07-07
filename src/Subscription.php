@@ -88,7 +88,7 @@ class Subscription
         $conn->unsubscribe($this, 0, false);
     }
 
-    public function nextMsg(int $timeout): Message
+    public function nextMsg(float $timeout): Message
     {
         $this->mu->pop();
 
@@ -131,8 +131,9 @@ class Subscription
 
         if ($this->connClosed) {
             $err = new Exception(Errors::ErrConnectionClosed->value);
+        } else {
+            $err = new Exception(Errors::ErrBadSubscription->value);
         }
-        $err = new Exception(Errors::ErrBadSubscription->value);
         $this->mu->push(1);
         return $err;
     }
@@ -164,7 +165,7 @@ class Subscription
             }
         }
 
-        if (strlen($msg->data) == 0 && $msg->header[Constants::statusHdr] === Constants::noResponders) {
+        if (strlen($msg->data) == 0 && $msg->header[Constants::statusHdr][0] === Constants::noResponders) {
             throw new Exception(Errors::ErrNoResponders->value);
         }
     }

@@ -70,3 +70,11 @@ function waitTime(Channel $ch, int $timeout)
     }
     return null;
 }
+
+function checkErrChannel(Channel $ch)
+{
+    $out = $ch->pop(0.001);
+    if ($ch->errCode == 0 && $out != null) {
+        throw $out;
+    }
+}
