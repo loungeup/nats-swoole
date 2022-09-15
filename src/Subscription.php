@@ -239,4 +239,17 @@ class Subscription
         $this->mu->push(1);
         return $out;
     }
+
+    public function drain()
+    {
+        $this->mu->pop();
+        $conn = $this->conn;
+        $this->mu->push(1);
+
+        if ($conn == null) {
+            throw new Exception(Errors::ErrBadSubscription->value);
+        }
+
+        return $conn->unsubscribe($this, 0, true);
+    }
 }

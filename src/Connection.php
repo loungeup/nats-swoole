@@ -2746,4 +2746,136 @@ class Connection
         $this->mu->push(1);
         return $buffered;
     }
+
+    public function drain()
+    {
+        $this->mu->pop();
+        if ($this->isClosed()) {
+            $this->mu->push(1);
+            throw new Exception(Errors::ErrConnectionClosed->value);
+        }
+
+        if ($this->isConnecting() || $this->isReconnecting()) {
+            $this->mu->push(1);
+            $this->close();
+            throw new Exception(Errors::ErrConnectionReconnecting->value);
+        }
+
+        if ($this->isDraining()) {
+            $this->mu->push(1);
+            return;
+        }
+
+        $this->status = ConnectionStatus::DRAINING_SUBS;
+        go([$this, "drainConnection"]);
+        $this->mu->push(1);
+        return;
+    }
+
+    private function drainConnection()
+    {
+        $this->mu->pop();
+
+        // check again if we are in state to process
+        if ($this->isClosed()) {
+            $this->mu->push(1);
+            return;
+        }
+        if ($this->isConnecting() || $this->isReconnecting()) {
+            $this->mu->push(1);
+            $this->close();
+            return;
+        }
+
+        $subs = [];
+        foreach ($this->subs as $s) {
+            if ($s == $this->respMux) {
+                continue;
+            }
+            $subs[] = $s;
+        }
+
+        $errCB = $this->opts->asyncErrorCB;
+        $drainWait = $this->opts->drainTimeout;
+        $respMux = $this->respMux;
+        $this->mu->push(1);
+
+        $pushErr = function (Exception $e) use ($errCB) {
+            $this->mu->pop();
+            $this->err = $e;
+            if ($errCB != null) {
+                $this->ach->push(function () use ($errCB, $e) {
+                    $errCB($this, null, $e);
+                });
+            }
+
+            $this->mu->push(1);
+        };
+
+        foreach ($subs as $s) {
+            try {
+                $s->drain();
+            } catch (Exception $e) {
+                $pushErr($e);
+            }
+        }
+
+        $timeout = strtotime("+" . $drainWait . " sec");
+        $min = null;
+
+        if ($respMux) {
+            $min = 1;
+        } else {
+            $min = 0;
+        }
+
+        while (strtotime("now") < $timeout) {
+            if ($this->numSubscriptions() == $min) {
+                break;
+            }
+
+            usleep(10000); // 10 ms
+        }
+
+        if ($respMux) {
+            try {
+                $respMux->drain();
+            } catch (Exception $e) {
+                $pushErr($e);
+            }
+
+            while (strtotime("now") < $timeout) {
+                if ($this->numSubscriptions() == 0) {
+                    break;
+                }
+
+                usleep(10000); // 10 ms
+            }
+        }
+
+        if ($this->numSubscriptions() != 0) {
+            $pushErr(new Exception(Errors::ErrDrainTimeout->value));
+        }
+
+        $this->mu->pop();
+        $this->status = ConnectionStatus::DRAINING_PUBS;
+        $this->mu->push(1);
+
+        try {
+            $this->flushTimeout(5 * 1000 * 1000);
+        } catch (Exception $e) {
+            $pushErr($e);
+        }
+
+        $this->close();
+    }
+
+    private function numSubscriptions(): int
+    {
+        $this->mu->pop();
+        $out = count($this->subs);
+        $this->mu->push(1);
+
+        return $out;
+    }
 }
