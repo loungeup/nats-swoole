@@ -64,7 +64,7 @@ class NatsReader
 
         $data = $this->r->recv();
 
-        if ($data === false) {
+        if ($data == false) {
             throw new Exception("Socket Read error : {$this->r->errCode} - {$this->r->errMsg}");
         }
 

@@ -16,7 +16,7 @@ class Options
         public ?bool $pedantic = false,
         public ?bool $secure = false,
         public $tlsConfig = null,
-        public ?bool $allowReconnect = false,
+        public ?bool $allowReconnect = null,
         public ?int $maxReconnect = null,
         public ?int $reconnectWait = null,
         public ?Closure $customReconnectDelayCB = null,

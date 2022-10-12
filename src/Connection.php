@@ -466,10 +466,13 @@ class Connection
         $errMsg = null;
 
         $this->conn = new Client(SWOOLE_SOCK_TCP);
-        $this->conn->connect($m[2], $m[3], -1);
+        $result = $this->conn->connect($m[2], $m[3], $this->opts->timeout);
 
-        if (!$this->conn) {
+        if (!$result) {
             throw new Exception("connection refused : ($errCode) $errMsg");
+        } else {
+            // set an infinite timeout, so we don't get disconnected when we don't have messages
+            $this->conn->set(["timeout" => -1]);
         }
 
         $this->connCpt++;
@@ -1836,6 +1839,10 @@ class Connection
     // Lock is assumed to be held by the caller.
     private function clearPendingFlushCalls()
     {
+        if ($this->pongs === null) {
+            return;
+        }
+
         foreach ($this->pongs as $ch) {
             if ($ch !== null) {
                 $ch->close();
