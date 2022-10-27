@@ -3,17 +3,14 @@
 namespace LoungeUp\Nats;
 
 use Closure;
-use DrainMode;
 use Exception;
 use stdClass;
+use Throwable;
 
-use LoungeUp\Nats\Options;
-use LoungeUp\Nats\ConnectionStatus;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\Client;
 use Swoole\Coroutine\WaitGroup;
 use Swoole\Timer;
-use Throwable;
 
 use function LoungeUp\Nats\Nuid\next;
 
@@ -2775,7 +2772,7 @@ class Connection
         }
 
         $this->status = ConnectionStatus::DRAINING_SUBS;
-        go([$this, "drainConnection", $drainMode]);
+        go([$this, "drainConnection"], $drainMode);
         $this->mu->push(1);
         return;
     }

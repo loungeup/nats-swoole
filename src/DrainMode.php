@@ -1,5 +1,7 @@
 <?php
 
+namespace LoungeUp\Nats;
+
 enum DrainMode
 {
     case DRAIN_SUBS;
