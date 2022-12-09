@@ -14,6 +14,8 @@ use Swoole\Timer;
 
 use function LoungeUp\Nats\Nuid\next;
 
+use Illuminate\Support\Facades\Log;
+
 class Connection
 {
     public ?Statistics $stats = null;
@@ -207,6 +209,12 @@ class Connection
             try {
                 $cur = $this->selectNextServer();
             } catch (Throwable $e) {
+                Log::info(
+                    "[process: " .
+                        getmypid() .
+                        "][Connection::doReconnect] : error when selecting next server : " .
+                        $e->getMessage(),
+                );
                 $this->err = $e;
                 break;
             }
@@ -244,6 +252,9 @@ class Connection
             $this->mu->pop();
 
             if ($this->isClosed()) {
+                Log::info(
+                    "[process: " . getmypid() . "][Connection::doReconnect] : cancel reconnect, connection is closed",
+                );
                 break;
             }
 
@@ -262,6 +273,12 @@ class Connection
                 $this->processConnectInit();
             } catch (Throwable $e) {
                 if ($this->ar) {
+                    Log::info(
+                        "[process: " .
+                            getmypid() .
+                            "][Connection::doReconnect] : error processing co init : " .
+                            $e->getMessage(),
+                    );
                     break;
                 }
 
@@ -321,6 +338,11 @@ class Connection
         [$i, $s] = $this->currentServer();
 
         if ($i < 0) {
+            Log::info(
+                "[process: " .
+                    getmypid() .
+                    "][Connection::selectNextServer] : error when getting current server, no server available",
+            );
             throw new Exception(Errors::ErrNoServers->value);
         }
 
@@ -336,6 +358,7 @@ class Connection
 
         if (count($this->srvPool) <= 0) {
             $this->current = null;
+            Log::info("[process: " . getmypid() . "][Connection::selectNextServer] : server pool is empty");
             throw new Exception(Errors::ErrNoServers->value);
         }
 

@@ -21,7 +21,8 @@
         }
     ],
     "require": {
-        "ext-openswoole": "^4.10.0"
+        "ext-openswoole": "^4.10.0",
+        "illuminate/log": "^9.42"
     },
     "require-dev": {
         "openswoole/ide-helper": "^4.7",
