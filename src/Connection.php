@@ -15,6 +15,7 @@ use Swoole\Timer;
 use function LoungeUp\Nats\Nuid\next;
 
 use Illuminate\Support\Facades\Log;
+use Swoole\Coroutine;
 
 class Connection
 {
@@ -225,7 +226,7 @@ class Connection
 
             if (!$doSleep) {
                 $i++;
-                usleep(5);
+                Coroutine::usleep(5);
             } else {
                 $i = 0;
                 $st = null;
@@ -509,7 +510,7 @@ class Connection
     private function bindToNewConn()
     {
         $this->bw->w = $this->conn;
-        $this->bw->buff = null;
+        $this->bw->buff = "";
         $this->br->r = $this->conn;
         $this->br->n = 0;
         $this->br->off = -1;
@@ -1974,7 +1975,9 @@ class Connection
 
         $this->mu->push(1);
 
-        $this->conn->close();
+        if ($this->conn) {
+            $this->conn->close();
+        }
     }
 
     public function isClosed(): bool
@@ -2695,7 +2698,7 @@ class Connection
                 return;
             }
 
-            usleep(100000); // 100ms
+            Coroutine::usleep(100000); // 100ms
         }
     }
 
@@ -2863,7 +2866,7 @@ class Connection
                     break;
                 }
 
-                usleep(10000); // 10 ms
+                Coroutine::usleep(10000); // 10 ms
             }
 
             if ($respMux) {
@@ -2878,7 +2881,7 @@ class Connection
                         break;
                     }
 
-                    usleep(10000); // 10 ms
+                    Coroutine::usleep(10000); // 10 ms
                 }
             }
 

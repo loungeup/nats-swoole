@@ -7,9 +7,9 @@ class Defaults
     const Version = "0.0.0";
     const URL = "nats://127.0.0.1:4222";
     const MaxReconnect = 60;
-    const ReconnectWait = 2 * 1000 * 1000; // microsecond
-    const ReconnectJitter = 100; // microsecond
-    const ReconnectJitterTls = 1 * 1000 * 1000; // microsecond
+    const ReconnectWait = 2_000_000; // microsecond
+    const ReconnectJitter = 100_000; // microsecond
+    const ReconnectJitterTls = 1_000_000; // microsecond
     const Timeout = 2;
     const PingInterval = 2 * 60; // second
     const MaxPingOut = 2;

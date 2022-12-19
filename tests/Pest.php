@@ -62,7 +62,7 @@ function wait(Channel $ch)
     return waitTime($ch, 5);
 }
 
-function waitTime(Channel $ch, int $timeout)
+function waitTime(Channel $ch, float $timeout)
 {
     $r = $ch->pop($timeout);
     if (!$r && $ch->errCode == -1) {

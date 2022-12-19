@@ -129,7 +129,7 @@ it("should call disconnectedErrCB on disconnect", function () {
 
         $nc->close();
     });
-})->skip("should check why cb is not called");
+});
 
 it("should handle a close connection", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));

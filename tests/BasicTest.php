@@ -1,5 +1,7 @@
 <?php
 
+use function LoungeUp\Nats\getDefaultOptions;
+use function LoungeUp\Nats\newInbox;
 use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\Defaults;
 use LoungeUp\Nats\Errors;
@@ -10,9 +12,6 @@ use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\WaitGroup;
 use Swoole\Runtime;
-
-use function LoungeUp\Nats\getDefaultOptions;
-use function LoungeUp\Nats\newInbox;
 
 beforeEach(function () {
     Coroutine::set([
@@ -74,7 +73,7 @@ it("should not leak coroutine on close", function () {
         $nc->close();
 
         // sleep a little to let pong processing exit
-        usleep(5 * 1000);
+        usleep(3 * 1000);
 
         $err = null;
         try {

@@ -2,6 +2,7 @@
 
 namespace LoungeUp\Nats\Nuid;
 
+use Swoole\Coroutine;
 use Swoole\Lock;
 
 abstract class Constants
@@ -102,7 +103,7 @@ function next(): string
 {
     $hasLock = $GLOBALS["globalNuid"]->mutex->trylock();
     while (!$hasLock) {
-        usleep(1);
+        Coroutine::usleep(1);
         $hasLock = $GLOBALS["globalNuid"]->mutex->trylock();
     }
 
