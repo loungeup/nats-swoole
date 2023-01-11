@@ -1,21 +1,21 @@
 <?php
 
-use Spiral\Goridge;
-use Swoole\Coroutine;
-use Swoole\Runtime;
-
 use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\ConnectionStatus;
 use LoungeUp\Nats\Errors;
 use LoungeUp\Nats\Message;
-use Swoole\Coroutine\Channel;
+use OpenSwoole\Coroutine;
+use OpenSwoole\Coroutine\Channel;
+use OpenSwoole\Runtime;
+use Spiral\Goridge;
 
 use function LoungeUp\Nats\getDefaultOptions;
 
 beforeAll(function () {
     Runtime::enableCoroutine();
     Coroutine::set([
-        "hook_flags" => SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_SOCKETS,
+        "log_level" => SWOOLE_LOG_INFO,
+        "hook_flags" => SWOOLE_HOOK_ALL,
         "socket_timeout" => -1,
         "enable_preemptive_scheduler" => true,
     ]);
@@ -25,7 +25,7 @@ beforeAll(function () {
 it("should handle a default connection", function () {
     expect(function () {
         $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-        Co\run(function () use ($rpc) {
+        co::run(function () use ($rpc) {
             $rpc->call("App.RunDefaultServer", "");
             $conn = newDefaultConnection();
             expect($conn)->toBeInstanceOf(Connection::class);
@@ -39,7 +39,7 @@ it("should have the right connection status", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
     $rpc->call("App.RunDefaultServer", "");
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $conn = newDefaultConnection();
         expect($conn)->toBeInstanceOf(Connection::class);
 
@@ -58,7 +58,7 @@ it("should have the right connection status", function () {
 it("should call closedCB", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $ch = new Channel(1);
         $o = getDefaultOptions();
@@ -83,7 +83,7 @@ it("should call closedCB", function () {
 it("should call disconnectedErrCB on close", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $ch = new Channel(1);
         $o = getDefaultOptions();
@@ -109,7 +109,7 @@ it("should call disconnectedErrCB on close", function () {
 it("should call disconnectedErrCB on disconnect", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $ch = new Channel(1);
         $o = getDefaultOptions();
@@ -134,7 +134,7 @@ it("should call disconnectedErrCB on disconnect", function () {
 it("should handle a close connection", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $c = newDefaultConnection();
@@ -167,11 +167,11 @@ it("should handle a close connection", function () {
 
 it("should not deadlock on connect", function () {
     Coroutine::set([
-        "hook_flags" => SWOOLE_HOOK_ALL,
+        "hook_flags" => SWOOLE_HOOK_ALL | SWOOLE_HOOK_SOCKETS,
         "socket_timeout" => -1,
         "enable_preemptive_scheduler" => true,
     ]);
-    Co\run(function () {
+    co::run(function () {
         $errCh = new Channel();
 
         $sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);

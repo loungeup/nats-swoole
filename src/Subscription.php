@@ -3,9 +3,7 @@ namespace LoungeUp\Nats;
 
 use Closure;
 use Exception;
-use Swoole\Coroutine\Channel;
-use Swoole\Coroutine\System;
-use Swoole\Lock;
+use OpenSwoole\Coroutine\Channel;
 use Throwable;
 
 enum SubscriptionType: int

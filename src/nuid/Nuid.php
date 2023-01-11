@@ -2,8 +2,8 @@
 
 namespace LoungeUp\Nats\Nuid;
 
-use Swoole\Coroutine;
-use Swoole\Lock;
+use OpenSwoole\Coroutine;
+use OpenSwoole\Lock;
 
 abstract class Constants
 {

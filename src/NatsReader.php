@@ -3,7 +3,7 @@
 namespace LoungeUp\Nats;
 
 use Exception;
-use Swoole\Coroutine\Client;
+use OpenSwoole\Coroutine\Client;
 use Throwable;
 
 class NatsReader
