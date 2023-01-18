@@ -2586,9 +2586,9 @@ class Connection
         $msg = $mch->pop($timeout);
 
         if ($msg === false) {
-            if ($mch->errCode === -2) {
+            if ($mch->errCode === Channel::CHANNEL_CLOSED) {
                 throw new Exception(Errors::ErrConnectionClosed->value);
-            } elseif ($mch->errCode === -1) {
+            } elseif ($mch->errCode === Channel::CHANNEL_TIMEOUT) {
                 $this->mu->pop();
                 unset($this->respMap[$token]);
                 $this->mu->push(1);
