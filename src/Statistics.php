@@ -2,7 +2,7 @@
 
 namespace LoungeUp\Nats;
 
-use Swoole\Atomic\Long;
+use OpenSwoole\Atomic\Long;
 
 class Statistics
 {

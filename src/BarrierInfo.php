@@ -4,7 +4,7 @@ namespace LoungeUp\Nats;
 
 use Closure;
 
-use Swoole\Atomic\Long;
+use OpenSwoole\Atomic\Long;
 
 class BarrierInfo
 {

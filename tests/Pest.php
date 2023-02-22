@@ -3,8 +3,7 @@
 use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\Constants;
 use LoungeUp\Nats\Defaults;
-use Swoole\Coroutine\Channel;
-use Swoole\Timer;
+use OpenSwoole\Coroutine\Channel;
 
 /**
  * helper method to access private function

@@ -3,9 +3,7 @@ namespace LoungeUp\Nats;
 
 use Closure;
 use Exception;
-use Swoole\Coroutine\Channel;
-use Swoole\Coroutine\System;
-use Swoole\Lock;
+use OpenSwoole\Coroutine\Channel;
 use Throwable;
 
 enum SubscriptionType: int
@@ -106,18 +104,18 @@ class Subscription
 
         // optimize immediate read
         $msg = $mch->pop(0.001);
-        if ($mch->errCode === -2) {
+        if ($mch->errCode === Channel::CHANNEL_CLOSED) {
             throw $this->getNextMsgErr();
-        } elseif ($mch->errCode !== -1) {
+        } elseif ($mch->errCode !== Channel::CHANNEL_TIMEOUT) {
             $this->processNextMsgDelivered($msg);
             return $msg;
         }
 
         $msg = $mch->pop($timeout);
 
-        if ($mch->errCode === -2) {
+        if ($mch->errCode === Channel::CHANNEL_CLOSED) {
             throw $this->getNextMsgErr();
-        } elseif ($mch->errCode === -1) {
+        } elseif ($mch->errCode === Channel::CHANNEL_TIMEOUT) {
             throw new Exception(Errors::ErrTimeout->value);
         } else {
             $this->processNextMsgDelivered($msg);

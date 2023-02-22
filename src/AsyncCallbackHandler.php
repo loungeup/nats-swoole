@@ -2,8 +2,8 @@
 namespace LoungeUp\Nats;
 
 use Closure;
-use Swoole\Coroutine\Channel;
-use Swoole\Lock;
+use OpenSwoole\Coroutine;
+use OpenSwoole\Coroutine\Channel;
 
 class AsyncCallbackHandler
 {
@@ -70,6 +70,8 @@ class AsyncCallbackHandler
 
         $this->cond->push(true);
         $this->mu->push(1);
+
+        Coroutine::usleep(100_000);
     }
 
     // add closure to tail and signal dispatcher

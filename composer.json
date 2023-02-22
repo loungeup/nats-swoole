@@ -21,11 +21,12 @@
         }
     ],
     "require": {
-        "ext-openswoole": "^4.10.0",
-        "illuminate/log": "^9.42"
+        "ext-openswoole": "^22.0.0",
+        "illuminate/log": "^9.42",
+        "openswoole/core": "^22.1"
     },
     "require-dev": {
-        "openswoole/ide-helper": "^4.7",
+        "openswoole/ide-helper": "^22.0",
         "pestphp/pest": "^1.21",
         "spiral/goridge": "^3.1"
     },

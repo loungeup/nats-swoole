@@ -1,21 +1,21 @@
 <?php
 
-use function LoungeUp\Nats\getDefaultOptions;
-use function LoungeUp\Nats\newInbox;
 use LoungeUp\Nats\Connection;
 use LoungeUp\Nats\Defaults;
 use LoungeUp\Nats\Errors;
 use LoungeUp\Nats\Message;
 use LoungeUp\Nats\Options;
+use OpenSwoole\Core\Coroutine\WaitGroup;
+use OpenSwoole\Coroutine;
+use OpenSwoole\Coroutine\Channel;
 use Spiral\Goridge;
-use Swoole\Coroutine;
-use Swoole\Coroutine\Channel;
-use Swoole\Coroutine\WaitGroup;
-use Swoole\Runtime;
+
+use function LoungeUp\Nats\getDefaultOptions;
+use function LoungeUp\Nats\newInbox;
 
 beforeEach(function () {
     Coroutine::set([
-        "hook_flags" => SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_SOCKETS,
+        "hook_flags" => SWOOLE_HOOK_ALL,
         "socket_timeout" => -1,
         "enable_preemptive_scheduler" => true,
     ]);
@@ -63,7 +63,7 @@ function checkNoCoroutineLeak(int $base, string $action)
 it("should not leak coroutine on close", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $base = getStableNumCoroutine();
@@ -90,7 +90,7 @@ it("should not leak coroutine on close", function () {
 });
 
 it("should not leak coroutine on failed connect", function () {
-    Co\run(function () {
+    co::run(function () {
         $base = getStableNumCoroutine();
 
         expect(fn() => Connection::createConnection(Defaults::URL))->toThrow(Exception::class);
@@ -109,7 +109,7 @@ it("should not leak coroutine on failed connect", function () {
 it("should have valid info after connect", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $nc = newDefaultConnection();
@@ -137,7 +137,7 @@ it("should have valid info after connect", function () {
 it("should handle multiple close", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $nc = newDefaultConnection();
@@ -160,7 +160,7 @@ it("should handle multiple close", function () {
 it("should throw exception on bad option timeout connect", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $opts = getDefaultOptions();
@@ -176,7 +176,7 @@ it("should throw exception on bad option timeout connect", function () {
 it("should handle simple publish", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $nc = newDefaultConnection();
@@ -199,7 +199,7 @@ it("should handle simple publish", function () {
 it("should handle simple publish with no data", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $nc = newDefaultConnection();
@@ -221,7 +221,7 @@ it("should handle simple publish with no data", function () {
 
 it("should not fail on publish on slow consumer", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $nc = newDefaultConnection();
@@ -264,7 +264,7 @@ it("should not fail on publish on slow consumer", function () {
 
 it("should handle async subscribe", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -302,7 +302,7 @@ it("should handle async subscribe", function () {
 
 it("should not leak async subscribe coroutine on close", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
 
         $ch = new Channel();
@@ -341,7 +341,7 @@ it("should not leak async subscribe coroutine on close", function () {
 
 it("should handle sync subscribe", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -371,7 +371,7 @@ it("should handle sync subscribe", function () {
 
 it("should handle pub sub with reply", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -401,7 +401,7 @@ it("should handle pub sub with reply", function () {
 
 it("should handle msg response", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -442,7 +442,7 @@ it("should handle flush", function () {
         "max_coroutine" => "10200",
     ]);
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -471,7 +471,7 @@ it("should handle flush", function () {
 
 it("should handle queue subscribe", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -524,7 +524,7 @@ it("should handle queue subscribe", function () {
 
 it("should handle reply args", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -553,7 +553,7 @@ it("should handle reply args", function () {
 
 it("should handle sync reply arg", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -578,7 +578,7 @@ it("should handle sync reply arg", function () {
 
 it("should handle unsubscribe", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -618,7 +618,7 @@ it("should handle unsubscribe", function () {
 
 it("should handle double unsubscribe", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -640,7 +640,7 @@ it("should handle double unsubscribe", function () {
 
 it("should throw timeout error", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -655,7 +655,7 @@ it("should throw timeout error", function () {
 
 it("should support basic no responder errors", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $url = $rpc->call("App.RunServerOnPort", "-1");
 
         $err = null;
@@ -705,7 +705,7 @@ it("should support basic no responder errors", function () {
 
 it("should handle oldRequestStyle", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $err = null;
 
@@ -765,7 +765,7 @@ it("should handle oldRequestStyle", function () {
 
 it("should handle newRequestStyle", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -790,7 +790,7 @@ it("should handle newRequestStyle", function () {
 
 it("should handle request without body", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -815,7 +815,7 @@ it("should handle request without body", function () {
 
 it("should handle simultaneous requests", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -851,7 +851,7 @@ it("should handle simultaneous requests", function () {
 
 it("should handle close during request", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 
@@ -882,7 +882,7 @@ it("should handle close during request", function () {
 
 it("should handle close timeout on request with response queued", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunDefaultServer", "");
         $nc = newDefaultConnection();
 

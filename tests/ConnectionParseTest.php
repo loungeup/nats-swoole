@@ -9,7 +9,7 @@ use LoungeUp\Nats\ParserState;
 use function LoungeUp\Nats\getDefaultOptions;
 
 it("should parse ping message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
 
@@ -55,7 +55,7 @@ it("should parse ping message", function () {
 });
 
 it("should parse pong message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
 
@@ -101,7 +101,7 @@ it("should parse pong message", function () {
 });
 
 it("should parse error message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
         $this->c->status = ConnectionStatus::CLOSED;
@@ -154,7 +154,7 @@ it("should parse error message", function () {
 });
 
 it("should parse ok message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
         expect($this->c->ps->state)->toBe(ParserState::OP_START);
@@ -175,7 +175,7 @@ it("should parse ok message", function () {
 });
 
 it("should fail to parse incorrect message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
         expect(fn() => callMethod(Connection::class, "parse", $this->c, [" PING"]))->toThrow(ParseException::class);
@@ -240,7 +240,7 @@ it("should fail to parse incorrect message", function () {
 });
 
 it("should parse split message", function () {
-    Co\run(function () {
+    co::run(function () {
         $this->c = new Connection(getDefaultOptions());
         $this->c->ps = new ParseState();
         expect(fn() => callMethod(Connection::class, "parse", $this->c, ["MSG a\r\n"]))->toThrow(Exception::class);

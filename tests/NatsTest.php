@@ -9,7 +9,7 @@ use LoungeUp\Nats\ServerInfo;
 use function LoungeUp\Nats\getDefaultOptions;
 
 test("test async INFO", function () {
-    Co\run(function () {
+    co::run(function () {
         $opts = getDefaultOptions();
         $c = new Connection($opts);
         $c->ps = new ParseState();

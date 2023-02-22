@@ -43,7 +43,7 @@ it("should correct reconnect jitter", function () {
 it("should close properly when allowreconnect is false", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunServerOnPort", "2222");
         $ch = new Channel(1);
         $options = getDefaultOptions();
@@ -78,7 +78,7 @@ it("should close properly when allowreconnect is false", function () {
 it("should reconnect properly when allowreconnect is true", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunServerOnPort", "2222");
         $ch = new Channel(1);
         $dch = new Channel(1);
@@ -119,7 +119,7 @@ it("should reconnect properly when allowreconnect is true", function () {
 it("should break reconnect loop on close", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunServerOnPort", "2222");
 
         $cch = new Channel(1);
@@ -150,7 +150,7 @@ it("should break reconnect loop on close", function () {
 it("should handle basic reconnect", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunServerOnPort", "2222");
 
         $ch = new Channel(10);
@@ -205,7 +205,7 @@ it("should handle basic reconnect", function () {
 it("should handle extended reconnect", function () {
     $rpc = new Goridge\RPC\RPC(Goridge\Relay::create("tcp://rpcnats:6001"));
 
-    Co\run(function () use ($rpc) {
+    co::run(function () use ($rpc) {
         $rpc->call("App.RunServerOnPort", "2222");
 
         /**

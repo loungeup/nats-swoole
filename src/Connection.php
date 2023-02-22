@@ -4,18 +4,16 @@ namespace LoungeUp\Nats;
 
 use Closure;
 use Exception;
+use OpenSwoole\Constant;
+use OpenSwoole\Core\Coroutine\WaitGroup;
+use OpenSwoole\Coroutine;
+use OpenSwoole\Coroutine\Channel;
+use OpenSwoole\Coroutine\Client;
+use OpenSwoole\Timer;
 use stdClass;
 use Throwable;
 
-use Swoole\Coroutine\Channel;
-use Swoole\Coroutine\Client;
-use Swoole\Coroutine\WaitGroup;
-use Swoole\Timer;
-
 use function LoungeUp\Nats\Nuid\next;
-
-use Illuminate\Support\Facades\Log;
-use Swoole\Coroutine;
 
 class Connection
 {
@@ -210,12 +208,6 @@ class Connection
             try {
                 $cur = $this->selectNextServer();
             } catch (Throwable $e) {
-                Log::info(
-                    "[process: " .
-                        getmypid() .
-                        "][Connection::doReconnect] : error when selecting next server : " .
-                        $e->getMessage(),
-                );
                 $this->err = $e;
                 break;
             }
@@ -253,9 +245,6 @@ class Connection
             $this->mu->pop();
 
             if ($this->isClosed()) {
-                Log::info(
-                    "[process: " . getmypid() . "][Connection::doReconnect] : cancel reconnect, connection is closed",
-                );
                 break;
             }
 
@@ -274,12 +263,6 @@ class Connection
                 $this->processConnectInit();
             } catch (Throwable $e) {
                 if ($this->ar) {
-                    Log::info(
-                        "[process: " .
-                            getmypid() .
-                            "][Connection::doReconnect] : error processing co init : " .
-                            $e->getMessage(),
-                    );
                     break;
                 }
 
@@ -339,11 +322,6 @@ class Connection
         [$i, $s] = $this->currentServer();
 
         if ($i < 0) {
-            Log::info(
-                "[process: " .
-                    getmypid() .
-                    "][Connection::selectNextServer] : error when getting current server, no server available",
-            );
             throw new Exception(Errors::ErrNoServers->value);
         }
 
@@ -359,7 +337,6 @@ class Connection
 
         if (count($this->srvPool) <= 0) {
             $this->current = null;
-            Log::info("[process: " . getmypid() . "][Connection::selectNextServer] : server pool is empty");
             throw new Exception(Errors::ErrNoServers->value);
         }
 
@@ -486,7 +463,7 @@ class Connection
         $errCode = null;
         $errMsg = null;
 
-        $this->conn = new Client(SWOOLE_SOCK_TCP);
+        $this->conn = new Client(Constant::SOCK_TCP);
         $result = $this->conn->connect($m[2], $m[3], $this->opts->timeout);
 
         if (!$result) {
@@ -2609,9 +2586,9 @@ class Connection
         $msg = $mch->pop($timeout);
 
         if ($msg === false) {
-            if ($mch->errCode === -2) {
+            if ($mch->errCode === Channel::CHANNEL_CLOSED) {
                 throw new Exception(Errors::ErrConnectionClosed->value);
-            } elseif ($mch->errCode === -1) {
+            } elseif ($mch->errCode === Channel::CHANNEL_TIMEOUT) {
                 $this->mu->pop();
                 unset($this->respMap[$token]);
                 $this->mu->push(1);
