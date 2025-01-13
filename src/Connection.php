@@ -2310,7 +2310,12 @@ class Connection
             }
 
             if ($m !== null && ($max == 0 || $delivered <= $max)) {
-                $mcb($m);
+                if (filter_var(getenv("NATS_SWOOLE_CONCURRENT_HANDLERS"), FILTER_VALIDATE_BOOLEAN)) {
+                    // TODO: Implement a mutex to prevent race conditions when handling messages on the same subject.
+                    go($mcb, $m);
+                } else {
+                    $mcb($m);
+                }
             }
 
             if ($max > 0 && $delivered >= $max) {
