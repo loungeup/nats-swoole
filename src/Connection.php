@@ -75,6 +75,11 @@ class Connection
 
     public int $connCpt = 0;
 
+    /**
+     * @var WaitGroup[]
+     */
+    private array $lockedMessageSubjects = [];
+
     public function __construct(public ?Options $opts = null)
     {
         $this->stats = new Statistics();
@@ -2310,12 +2315,7 @@ class Connection
             }
 
             if ($m !== null && ($max == 0 || $delivered <= $max)) {
-                if (filter_var(getenv("NATS_SWOOLE_CONCURRENT_HANDLERS"), FILTER_VALIDATE_BOOLEAN)) {
-                    // TODO: Implement a mutex to prevent race conditions when handling messages on the same subject.
-                    go($mcb, $m);
-                } else {
-                    $mcb($m);
-                }
+                $this->handleMessage($mcb, $m);
             }
 
             if ($max > 0 && $delivered >= $max) {
@@ -2341,6 +2341,41 @@ class Connection
         }
 
         $s->mu->push(1);
+    }
+
+    private function handleMessage(Closure $handler, Message $message): void
+    {
+        if (filter_var(getenv("NATS_SWOOLE_CONCURRENT_HANDLERS"), FILTER_VALIDATE_BOOLEAN)) {
+            $this->handleMessageConcurrently($handler, $message);
+            return;
+        }
+
+        $handler($message);
+    }
+
+    private function handleMessageConcurrently(Closure $handler, Message $message): void
+    {
+        $subject = $message->subject;
+        if (empty($subject)) {
+            return; // Should never happen (https://docs.nats.io/nats-concepts/subjects).
+        }
+
+        if (empty($this->lockedMessageSubjects[$subject])) {
+            $this->lockedMessageSubjects[$subject] = new WaitGroup();
+        } else {
+            $this->lockedMessageSubjects[$subject]->wait();
+        }
+
+        Coroutine::create(function () use ($handler, $message, $subject) {
+            $this->lockedMessageSubjects[$subject]->add();
+
+            try {
+                $handler($message);
+            } finally {
+                $this->lockedMessageSubjects[$subject]->done();
+                unset($this->lockedMessageSubjects[$subject]);
+            }
+        });
     }
 
     public function removeSub(Subscription $s)
