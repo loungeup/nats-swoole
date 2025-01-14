@@ -2373,7 +2373,10 @@ class Connection
                 $handler($message);
             } finally {
                 $this->lockedMessageSubjects[$subject]->done();
-                unset($this->lockedMessageSubjects[$subject]);
+
+                if ($this->lockedMessageSubjects[$subject]->count() === 0) {
+                    unset($this->lockedMessageSubjects[$subject]);
+                }
             }
         });
     }
