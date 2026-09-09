@@ -18,20 +18,17 @@ class NatsReader
 
     public function readString(string $delim)
     {
-        $s = null;
-        $i = null;
+        $s = "";
 
         while (true) {
             // check current buffer before reading
             if ($this->off >= 0) {
-                $i = strpos(substr($this->buff, $this->off, $this->n), $delim);
+                $rest = substr($this->buff, $this->off);
+                $i = strpos($rest, $delim);
 
-                if ($i && $i >= 0) {
-                    $end = $this->off + $i + 1;
-                    $s .= substr($this->buff, $this->off, $end);
-                    $this->buff = substr($this->buff, $this->off, $end - $this->off + 1);
-
-                    $this->off = $end;
+                if ($i !== false) {
+                    $s .= substr($rest, 0, $i + 1);
+                    $this->off += $i + 1;
 
                     if ($this->off >= $this->n) {
                         $this->off = -1;
@@ -41,7 +38,7 @@ class NatsReader
                 }
 
                 // no delim found, we need to read more
-                $s .= substr($this->buff, $this->off, $this->n - $this->off + 1);
+                $s .= $rest;
                 $this->off = -1;
             }
 
@@ -59,7 +56,7 @@ class NatsReader
         if ($this->off >= 0) {
             $off = $this->off;
             $this->off = -1;
-            return substr($this->buff, $off, $this->n - $off + 1);
+            return substr($this->buff, $off);
         }
 
         $data = $this->r->recv();

@@ -977,7 +977,7 @@ class Connection
         return $this->ar;
     }
 
-    private function processOpErr(Exception $e)
+    private function processOpErr(Throwable $e)
     {
         $this->mu->pop();
 
@@ -1348,7 +1348,7 @@ class Connection
 
         $this->mu->pop();
 
-        if (count($this->pongs) > 0) {
+        if (!empty($this->pongs)) {
             $ch = $this->pongs[0];
             array_shift($this->pongs);
         }
@@ -1773,7 +1773,7 @@ class Connection
                                 $arg = $this->ps->argBuf;
                                 $this->ps->argBuf = null;
                             } else {
-                                $arg = substr($buf, $this->ps->as, $i - $this->ps->drop);
+                                $arg = substr($buf, $this->ps->as, $i - $this->ps->drop - $this->ps->as);
                             }
 
                             $this->processAsyncInfo($arg);

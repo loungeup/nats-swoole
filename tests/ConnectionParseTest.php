@@ -335,3 +335,21 @@ it("should parse split message", function () {
         expect($this->c->ps->state)->toBe(ParserState::OP_START);
     });
 });
+
+it("should parse async info followed by another op in the same buffer", function () {
+    co::run(function () {
+        $this->c = new Connection(getDefaultOptions());
+        $this->c->ps = new ParseState();
+
+        $this->c->newReaderWriter();
+        $this->c->bw->switchToPending();
+
+        callMethod(Connection::class, "parse", $this->c, [
+            "INFO {\"server_id\":\"srv\",\"version\":\"2.14.6\",\"connect_info\":true} \r\nPING\r\n",
+        ]);
+
+        expect($this->c->ps->state)->toBe(ParserState::OP_START);
+        expect($this->c->info->id)->toBe("srv");
+        expect($this->c->info->version)->toBe("2.14.6");
+    });
+});

@@ -26,6 +26,10 @@ class ServerInfo
     {
         $obj = json_decode($json);
 
+        if (!is_object($obj)) {
+            return;
+        }
+
         if (property_exists($obj, "server_id")) {
             $this->id = $obj->server_id;
         }
